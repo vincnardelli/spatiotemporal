@@ -1,0 +1,32 @@
+{
+    "id": "7219FFF4",
+    "path": null,
+    "project_path": null,
+    "type": "r_dataframe",
+    "hash": "0",
+    "contents": "",
+    "dirty": false,
+    "created": 1606765722550.0,
+    "source_on_save": false,
+    "relative_order": 7,
+    "properties": {
+        "expression": "stations",
+        "caption": "stations",
+        "totalObservations": 4457,
+        "displayedObservations": 4457,
+        "variables": 8,
+        "cacheKey": "78C235BB",
+        "object": "stations",
+        "environment": "",
+        "contentUrl": "grid_resource/gridviewer.html?env=&obj=stations&cache_key=78C235BB&max_cols=50",
+        "preview": 0
+    },
+    "folds": "",
+    "lastKnownWriteTime": 8169863397683326069,
+    "encoding": "",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1606765722550,
+    "read_only": false,
+    "read_only_alternatives": []
+}

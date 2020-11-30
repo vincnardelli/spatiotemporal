@@ -1,0 +1,32 @@
+{
+    "id": "1CEBAABF",
+    "path": null,
+    "project_path": null,
+    "type": "r_dataframe",
+    "hash": "0",
+    "contents": "",
+    "dirty": false,
+    "created": 1606769274613.0,
+    "source_on_save": false,
+    "relative_order": 7,
+    "properties": {
+        "expression": "gdp",
+        "caption": "gdp",
+        "totalObservations": 1496,
+        "displayedObservations": 1496,
+        "variables": 4,
+        "cacheKey": "89E68C7A",
+        "object": "gdp",
+        "environment": "",
+        "contentUrl": "grid_resource/gridviewer.html?env=&obj=gdp&cache_key=89E68C7A&max_cols=50",
+        "preview": 0
+    },
+    "folds": "",
+    "lastKnownWriteTime": 0,
+    "encoding": "",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1606769274613,
+    "read_only": false,
+    "read_only_alternatives": []
+}
