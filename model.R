@@ -38,14 +38,16 @@ stack_est <- inla.stack(data=list(logPM10=data$logPM10),
                         effects=list(c(s_index,list(Intercept=1)), list(data[,cov_names])), tag="est")
 
 
+
+
 A_pred <- inla.spde.make.A(mesh=mesh,
-                           as.matrix(grid),
+                           st_coordinates(grid_sf),
                            group=i_day,  #selected day for prediction
                            n.group=n_days)
 
 stack_pred <- inla.stack(data=list(logPM10=NA),
                          A=list(A_pred,1),
-                         effects=list(c(s_index,list(Intercept=1)), list(covariate_matrix_std)),
+                         effects=list(c(s_index,list(Intercept=1)), list(st_drop_geometry(grid_sf))),
                          tag="pred")
 
 # TEST SUGLI STESSI PUNTI
@@ -83,7 +85,7 @@ sigma2e_stdev <- sqrt(sigma2e_m2 - sigma2e_m1^2)
 sigma2e_quantiles <- inla.qmarginal(c(0.025, 0.5, 0.975), sigma2e_marg)
 
 ar <- output$summary.hyperpar["GroupRho for spatial.field",]
-
+ar
 # Spatial parameters sigma2 and range
 mod.field <- inla.spde2.result(output, name="spatial.field", spde)
 
@@ -103,7 +105,16 @@ index_pred <- inla.stack.index(stack,"pred")$data
 lp_marginals <- output$marginals.linear.predictor[index_pred]
 
 lp_mean <- unlist(lapply(lp_marginals, function(x) inla.emarginal(exp, x)))
-lp_grid_mean <- matrix(lp_mean, 56, 72, byrow=T)
+grid_sf$lp_mean <- lp_mean
+
+plot(grid_sf$lp_mean)
+
+ggplot() +
+  geom_sf(data=grid_sf, aes(color=lp_mean))
+
+
+
+###############################à
 
 # Select only points inside Piemonte and set NA to the outer points 
 lp_grid_mean[index_mountains] <- NA

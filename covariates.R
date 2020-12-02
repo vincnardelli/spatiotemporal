@@ -278,6 +278,16 @@ data$time <- as.numeric(data$date) - as.numeric(data$date)[1]+1
 data$logPM10 <- log(ifelse(data$value == 0, 1, data$value))
 
 
+ggplot(data) + 
+  geom_density(aes(x=logPM10))
+
+colnames(data)
+
+to_scale <- c("alt", "prec")
+mean_covariates <- apply(data[,to_scale],2,mean, na.rm = T)
+sd_covariates <- apply(data[,to_scale],2,sd, na.rm = T)
+data[,to_scale] <- scale(data[,to_scale],center=mean_covariates, scale=sd_covariates)
+
 
 grid <- st_make_grid(nuts3, what="centers", n = 100)
 grid <- grid[nuts3]
@@ -287,6 +297,8 @@ plot(grid)
 grid_sf <- st_as_sf(grid)
 grid_sf$prec <- raster::extract(prec, grid_sf)
 grid_sf$alt <- raster::extract(alt, grid_sf)
+
+grid_sf[,to_scale] <- scale(st_drop_geometry(grid_sf[,to_scale]),center=mean_covariates, scale=sd_covariates)
 
 
 plot(grid_sf, pch=20)
