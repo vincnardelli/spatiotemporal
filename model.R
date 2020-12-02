@@ -1,7 +1,27 @@
 require(INLA)
+library(ggregplot)
+#remotes::install_github("gfalbery/ggregplot")
 inla.setOption(scale.model.default=FALSE)
 
-cov_names <- c("alt", "prec")
+
+
+grid <- st_make_grid(nuts3, what="centers", n = 100)
+grid <- grid[nuts3]
+
+
+grid_sf <- st_as_sf(grid)
+grid_sf$prec <- raster::extract(prec, grid_sf)
+grid_sf$alt <- raster::extract(alt, grid_sf)
+grid_sf$tmin <- raster::extract(tmin, grid_sf)
+grid_sf$tmax <- raster::extract(tmax, grid_sf)
+grid_sf$wind <- raster::extract(wind, grid_sf)
+grid_sf <- st_join(grid_sf, nuts3)
+grid_sf[,to_scale] <- scale(st_drop_geometry(grid_sf[,to_scale]),center=mean_covariates, scale=sd_covariates)
+
+
+
+
+cov_names <- c("alt", "prec", "tmin", "tmax", "gdp", "pop_density", "popgdp", "business_size")
 
 
 mesh <- inla.mesh.2d(loc=coordinates, 
@@ -50,27 +70,28 @@ stack_pred <- inla.stack(data=list(logPM10=NA),
                          effects=list(c(s_index,list(Intercept=1)), list(st_drop_geometry(grid_sf))),
                          tag="pred")
 
-# TEST SUGLI STESSI PUNTI
-# A_pred <- inla.spde.make.A(mesh=mesh,
-#                            loc=apply(coordinates, 2, rep, times=n_days),
-#                            group=data$time,
-#                            n.group=n_days)
-# 
-# stack_pred <- inla.stack(data=list(logPM10=NA),
-#                         A=list(A_pred, 1),
-#                         effects=list(c(s_index,list(Intercept=1)), list(data[,cov_names])), tag="pred")
 
 
 stack <- inla.stack(stack_est, stack_pred)
 
-formula <- logPM10 ~ -1 + Intercept + alt + prec +
+formula <- logPM10 ~ -1 + Intercept + alt + prec + tmin + tmax + gdp + pop_density + popgdp + business_size +
   f(spatial.field, model=spde,group=spatial.field.group, control.group=list(model="ar1"))
 
 output <- inla(formula,
                data=inla.stack.data(stack, spde=spde),
                family="gaussian",
                control.predictor=list(A=inla.stack.A(stack), compute=TRUE), 
+               control.compute=list(dic=TRUE),
                verbose=T)  
+
+
+summary(output)
+
+output$summary.fixed
+output$summary.linear.predictor
+nrow(output$summary.fitted.values)
+
+
 
 # Fixed effects betas
 fixed.out <- round(output$summary.fixed,3)
@@ -102,6 +123,10 @@ range.nom.stdev <- sqrt(range.nom.m2 - range.nom.m1^2)
 range.nom.quantiles <- inla.qmarginal(c(0.025, 0.5, 0.975), range.nom.marg)
 
 index_pred <- inla.stack.index(stack,"pred")$data
+
+
+
+
 lp_marginals <- output$marginals.linear.predictor[index_pred]
 
 lp_mean <- unlist(lapply(lp_marginals, function(x) inla.emarginal(exp, x)))
@@ -110,59 +135,145 @@ grid_sf$lp_mean <- lp_mean
 plot(grid_sf$lp_mean)
 
 ggplot() +
-  geom_sf(data=grid_sf, aes(color=lp_mean))
+  geom_sf(data=grid_sf, aes(color=lp_mean)) + 
+  geom_sf(data=st_as_sf(data), aes(size=value), alpha= 0.1) 
 
+
+
+grid_sf$very_poor  <- 1-sapply(X=lp_marginals, FUN=function(x) inla.pmarginal(marginal=x,log(150)))
+grid_sf$poor  <- 1-sapply(X=lp_marginals, FUN=function(x) inla.pmarginal(marginal=x,log(100)))
+grid_sf$moderate  <- 1-sapply(X=lp_marginals, FUN=function(x) inla.pmarginal(marginal=x,log(50)))
+grid_sf$fair  <- 1-sapply(X=lp_marginals, FUN=function(x) inla.pmarginal(marginal=x,log(40)))
+grid_sf$good  <- 1-sapply(X=lp_marginals, FUN=function(x) inla.pmarginal(marginal=x,log(20)))
+
+ggplot() +
+  geom_sf(data=grid_sf, aes(alpha=good), color="#52F0E6") +
+  geom_sf(data=grid_sf, aes(alpha=fair), color="#51CDAA") +
+  geom_sf(data=grid_sf, aes(alpha=moderate), color="#EEE741") +
+  geom_sf(data=grid_sf, aes(alpha=poor), color="#FE5050") +
+  geom_sf(data=grid_sf, aes(alpha=very_poor), color="#960032") +
+  theme_void()
+  
+  
+  #52F0E6
+
+grid_sf$moderate  <- 1-sapply(X=lp_marginals, FUN=function(x) inla.pmarginal(marginal=x,log(50)))
+
+ggplot() +
+  geom_sf(data=grid_sf, aes(alpha=good), color="#52F0E6") +
+  geom_sf(data=grid_sf, aes(alpha=fair), color="#51CDAA") +
+  geom_sf(data=grid_sf, aes(alpha=moderate), color="#EEE741") +
+  geom_sf(data=grid_sf, aes(alpha=poor), color="#FE5050") +
+  geom_sf(data=grid_sf, aes(alpha=very_poor), color="#960032") + 
+  theme_void()
+
+ggplot() +
+  geom_sf(data=grid_sf, aes(alpha=poor), color="#FE5050") 
+
+
+grid_tile <- grid_sf
+grid_tile$x <- st_coordinates(grid_sf)[,1]
+grid_tile$y <- st_coordinates(grid_sf)[,2]
+
+ggplot(grid_tile) + geom_tile(aes(x, y, fill = fair)) +
+  coord_fixed(ratio = 1) +
+  scale_fill_gradient(
+    name = "Fair",
+    low = "black", high = "#51CDAA"
+  ) +
+  theme_void()
+
+ggplot(grid_tile) + geom_tile(aes(x, y, fill = good)) +
+ coord_fixed(ratio = 1) +
+  scale_fill_gradient(
+    name = "Good",
+    low = "white", high = "#52F0E6"
+  ) +  theme_void()
+
+
+ggplot(grid_tile) + geom_tile(aes(x, y, fill = fair)) +
+  coord_fixed(ratio = 1) +
+  scale_fill_gradient(
+    name = "Fair",
+    low = "black", high = "#51CDAA"
+  ) +
+  theme_void()
+
+
+ggplot(grid_tile) + geom_tile(aes(x, y, fill = fair)) +
+  coord_fixed(ratio = 1) +
+  scale_fill_gradient(
+    name = "Fair",
+    low = "black", high = "#51CDAA"
+  ) +
+  theme_void()
+
+
+
+
+# 
+# 
+# new_extent <- extent(5, 20, 36, 48)
+# class(new_extent)
+# 
+# r <- raster(ncols=100, nrows=100, xmn=5, xmx=20, ymn=36, ymx=48)
+# raster::rasterize(grid_sf$poor, r)
+# stars::st_rasterize(grid_sf$poor)
+# library(stars)
+# 
+# raster <- st_rasterize(grid_sf)
+# plot(raster)
 
 
 ###############################à
-
-# Select only points inside Piemonte and set NA to the outer points 
-lp_grid_mean[index_mountains] <- NA
-library(splancs)
-inside_Piemonte <- matrix(inout(Piemonte_grid, borders), 56, 72, byrow=T)
-inside_Piemonte[inside_Piemonte==0] <- NA
-inside_lp_grid_mean <- inside_Piemonte *  lp_grid_mean
-
-seq.x.grid <- seq(range(Piemonte_grid[,1])[1],range(Piemonte_grid[,1])[2],length=56)
-seq.y.grid <- seq(range(Piemonte_grid[,2])[1],range(Piemonte_grid[,2])[2],length=72)
-
-# *** Code for Figure 7.9
-print(levelplot(x=inside_lp_grid_mean,
-                row.values=seq.x.grid,
-                column.values=seq.y.grid,
-                ylim=c(4875,5159), xlim=c(309,529),
-                col.regions=gray(seq(.9,.2,l=100)),
-                aspect="iso",
-                contour=TRUE, labels=FALSE, pretty=TRUE, 
-                xlab="",ylab=""))
-trellis.focus("panel", 1, 1, highlight=FALSE)
-lpoints(borders,col=1,cex=.25)
-
-lpoints(coordinates$UTMX, coordinates$UTMY,col=1,lwd=2,pch=21)
-trellis.unfocus()
-
-# ***
-
-# *** Code for Figure 7.10
-threshold <- log(50)
-prob  <- lapply(X=lp_marginals, FUN=function(x) inla.pmarginal(marginal=x,threshold))
-tailprob_grid <- matrix(1-unlist(prob),56,72, byrow=T)
-
-tailprob_grid[index_mountains] <- NA
-inside_tailprob_grid <- inside_Piemonte *  tailprob_grid
-
-print(levelplot(x=inside_tailprob_grid,
-                row.values=seq.x.grid,
-                column.values=seq.y.grid,
-                ylim=c(4875,5159), xlim=c(309,529),
-                at=seq(0,1,by=.1),
-                col.regions=gray(seq(.9,.2,l=100)),
-                aspect="iso",
-                contour=TRUE, labels=FALSE, pretty=TRUE, 
-                xlab="",ylab=""))
-trellis.focus("panel", 1, 1, highlight=FALSE)
-lpoints(borders,col=1,cex=.25)
-lpoints(coordinates$UTMX, coordinates$UTMY,col=1,lwd=2,pch=21)
-trellis.unfocus()
-# ***
-
+# 
+# # Select only points inside Piemonte and set NA to the outer points 
+# lp_grid_mean[index_mountains] <- NA
+# library(splancs)
+# inside_Piemonte <- matrix(inout(Piemonte_grid, borders), 56, 72, byrow=T)
+# inside_Piemonte[inside_Piemonte==0] <- NA
+# inside_lp_grid_mean <- inside_Piemonte *  lp_grid_mean
+# 
+# seq.x.grid <- seq(range(Piemonte_grid[,1])[1],range(Piemonte_grid[,1])[2],length=56)
+# seq.y.grid <- seq(range(Piemonte_grid[,2])[1],range(Piemonte_grid[,2])[2],length=72)
+# 
+# # *** Code for Figure 7.9
+# print(levelplot(x=inside_lp_grid_mean,
+#                 row.values=seq.x.grid,
+#                 column.values=seq.y.grid,
+#                 ylim=c(4875,5159), xlim=c(309,529),
+#                 col.regions=gray(seq(.9,.2,l=100)),
+#                 aspect="iso",
+#                 contour=TRUE, labels=FALSE, pretty=TRUE, 
+#                 xlab="",ylab=""))
+# trellis.focus("panel", 1, 1, highlight=FALSE)
+# lpoints(borders,col=1,cex=.25)
+# 
+# lpoints(coordinates$UTMX, coordinates$UTMY,col=1,lwd=2,pch=21)
+# trellis.unfocus()
+# 
+# # ***
+# 
+# # *** Code for Figure 7.10
+# threshold <- log(50)
+# prob  <- lapply(X=lp_marginals, FUN=function(x) inla.pmarginal(marginal=x,threshold))
+# tailprob_grid <- matrix(1-unlist(prob),56,72, byrow=T)
+# 
+# tailprob_grid[index_mountains] <- NA
+# inside_tailprob_grid <- inside_Piemonte *  tailprob_grid
+# 
+# print(levelplot(x=inside_tailprob_grid,
+#                 row.values=seq.x.grid,
+#                 column.values=seq.y.grid,
+#                 ylim=c(4875,5159), xlim=c(309,529),
+#                 at=seq(0,1,by=.1),
+#                 col.regions=gray(seq(.9,.2,l=100)),
+#                 aspect="iso",
+#                 contour=TRUE, labels=FALSE, pretty=TRUE, 
+#                 xlab="",ylab=""))
+# trellis.focus("panel", 1, 1, highlight=FALSE)
+# lpoints(borders,col=1,cex=.25)
+# lpoints(coordinates$UTMX, coordinates$UTMY,col=1,lwd=2,pch=21)
+# trellis.unfocus()
+# # ***
+# 

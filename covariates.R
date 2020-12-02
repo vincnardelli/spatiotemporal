@@ -239,6 +239,31 @@ ggplot() +
   theme_void() +
   ggtitle("Precipitazioni in mm - Gennaio 2018")
 
+#tempmin
+
+tmin <- raster("raster/wc2.1_2.5m_tmin_2018-01.tif")
+tmin_cropped <- crop(x = tmin, y = new_extent)
+tmin_df <- as.data.frame(tmin_cropped, xy = TRUE)
+
+ggplot() +
+  geom_raster(data = tmin_df , aes(x = x, y = y, fill = wc2.1_2.5m_tmin_2018.01)) +
+  scale_fill_viridis_c() +
+  coord_quickmap() +
+  theme_void() +
+  ggtitle("Temp min in C - Gennaio 2018")
+
+#tempmmax
+
+tmax <- raster("raster/wc2.1_2.5m_tmax_2018-01.tif")
+tmax_cropped <- crop(x = tmax, y = new_extent)
+tmax_df <- as.data.frame(tmax_cropped, xy = TRUE)
+
+ggplot() +
+  geom_raster(data = tmax_df , aes(x = x, y = y, fill = wc2.1_2.5m_tmax_2018.01)) +
+  scale_fill_viridis_c() +
+  coord_quickmap() +
+  theme_void() +
+  ggtitle("Temp max in C - Gennaio 2018")
 
 #wind
 
@@ -259,6 +284,10 @@ ggplot() +
 
 stations$prec <- raster::extract(prec, coordinates)
 stations$alt <- raster::extract(alt, coordinates)
+stations$tmin <- raster::extract(tmin, coordinates)
+stations$tmax <- raster::extract(tmax, coordinates)
+stations$wind <- raster::extract(wind, coordinates)
+
 
 
 
@@ -283,25 +312,10 @@ ggplot(data) +
 
 colnames(data)
 
-to_scale <- c("alt", "prec")
+to_scale <- c("alt", "prec", "tmin", "tmax", "wind", "gdp", "pop_density", "popgdp", "business_size")
 mean_covariates <- apply(data[,to_scale],2,mean, na.rm = T)
 sd_covariates <- apply(data[,to_scale],2,sd, na.rm = T)
 data[,to_scale] <- scale(data[,to_scale],center=mean_covariates, scale=sd_covariates)
-
-
-grid <- st_make_grid(nuts3, what="centers", n = 100)
-grid <- grid[nuts3]
-plot(grid)
-
-
-grid_sf <- st_as_sf(grid)
-grid_sf$prec <- raster::extract(prec, grid_sf)
-grid_sf$alt <- raster::extract(alt, grid_sf)
-
-grid_sf[,to_scale] <- scale(st_drop_geometry(grid_sf[,to_scale]),center=mean_covariates, scale=sd_covariates)
-
-
-plot(grid_sf, pch=20)
 
 
 #rm(list=setdiff(ls(), c("data", "stations", "nuts3", "coordinates")))
