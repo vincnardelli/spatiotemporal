@@ -5,7 +5,7 @@ inla.setOption(scale.model.default=FALSE)
 
 
 
-grid <- st_make_grid(nuts3, what="centers", n = 100)
+grid <- st_make_grid(nuts3, what="centers", n = 200)
 grid <- grid[nuts3]
 
 
@@ -139,77 +139,113 @@ ggplot() +
   geom_sf(data=st_as_sf(data), aes(size=value), alpha= 0.1) 
 
 
-
-grid_sf$very_poor  <- 1-sapply(X=lp_marginals, FUN=function(x) inla.pmarginal(marginal=x,log(150)))
-grid_sf$poor  <- 1-sapply(X=lp_marginals, FUN=function(x) inla.pmarginal(marginal=x,log(100)))
-grid_sf$moderate  <- 1-sapply(X=lp_marginals, FUN=function(x) inla.pmarginal(marginal=x,log(50)))
-grid_sf$fair  <- 1-sapply(X=lp_marginals, FUN=function(x) inla.pmarginal(marginal=x,log(40)))
-grid_sf$good  <- 1-sapply(X=lp_marginals, FUN=function(x) inla.pmarginal(marginal=x,log(20)))
-
+grid_sf %>% 
+  mutate(check = lp_mean > 50) %>% 
 ggplot() +
-  geom_sf(data=grid_sf, aes(alpha=good), color="#52F0E6") +
-  geom_sf(data=grid_sf, aes(alpha=fair), color="#51CDAA") +
-  geom_sf(data=grid_sf, aes(alpha=moderate), color="#EEE741") +
-  geom_sf(data=grid_sf, aes(alpha=poor), color="#FE5050") +
-  geom_sf(data=grid_sf, aes(alpha=very_poor), color="#960032") +
-  theme_void()
-  
-  
-  #52F0E6
+  geom_sf(aes(color=check))
 
-grid_sf$moderate  <- 1-sapply(X=lp_marginals, FUN=function(x) inla.pmarginal(marginal=x,log(50)))
 
-ggplot() +
-  geom_sf(data=grid_sf, aes(alpha=good), color="#52F0E6") +
-  geom_sf(data=grid_sf, aes(alpha=fair), color="#51CDAA") +
-  geom_sf(data=grid_sf, aes(alpha=moderate), color="#EEE741") +
-  geom_sf(data=grid_sf, aes(alpha=poor), color="#FE5050") +
-  geom_sf(data=grid_sf, aes(alpha=very_poor), color="#960032") + 
-  theme_void()
 
-ggplot() +
-  geom_sf(data=grid_sf, aes(alpha=poor), color="#FE5050") 
+grid_sf$verypoor  <- 1-sapply(X=lp_marginals, FUN=function(x) inla.pmarginal(marginal=x,log(100)))
+ggplot(grid_sf) +
+  geom_sf(aes(alpha=verypoor), color="#A4122E")
+
+grid_sf$poor  <- 1-sapply(X=lp_marginals, FUN=function(x) inla.pmarginal(marginal=x,log(50)))-grid_sf$verypoor
+ggplot(grid_sf) +
+  geom_sf(aes(alpha=poor), color="#FE5050")
+
+grid_sf$moderate  <- 1-sapply(X=lp_marginals, FUN=function(x) inla.pmarginal(marginal=x,log(40)))-grid_sf$poor
+ggplot(grid_sf) +
+  geom_sf(aes(alpha=moderate), color="#EEE741")
+
+grid_sf$fair  <- 1-sapply(X=lp_marginals, FUN=function(x) inla.pmarginal(marginal=x,log(20)))-grid_sf$moderate
+ggplot(grid_sf) +
+  geom_sf(aes(alpha=fair), color="#51CDAA")
+
+grid_sf$good  <- sapply(X=lp_marginals, FUN=function(x) inla.pmarginal(marginal=x,log(20)))
+ggplot(grid_sf) +
+  geom_sf(aes(alpha=good), color="#52F0E6")
+
+
+
+
 
 
 grid_tile <- grid_sf
 grid_tile$x <- st_coordinates(grid_sf)[,1]
 grid_tile$y <- st_coordinates(grid_sf)[,2]
+ggplot(grid_tile) + 
+  geom_tile(aes(x, y, alpha=good), fill="#52F0E6") +
+  geom_tile(aes(x, y, alpha=fair), fill="#51CDAA") +
+  geom_tile(aes(x, y, alpha=moderate), fill="#EEE741") +
+  geom_tile(aes(x, y, alpha=poor), fill="#FE5050") +
+  geom_tile(aes(x, y, alpha=verypoor), fill="#A4122E") +
+  coord_fixed(ratio = 1.4) +
+  theme_void()+
+  scale_alpha(range = c(0, 1))
 
-ggplot(grid_tile) + geom_tile(aes(x, y, fill = fair)) +
-  coord_fixed(ratio = 1) +
+
+nuts3 <- st_as_sf(nuts3)
+
+a <- ggplot(grid_tile) + geom_tile(aes(x, y, fill = good)) +
+  coord_fixed(ratio = 1.4) +
   scale_fill_gradient(
-    name = "Fair",
+    name = "Prob",
+    low = "black", high = "#52F0E6"
+  ) +
+  theme_void() +
+  ggtitle("Good")+
+  scale_alpha(range = c(0, 1)) +
+  theme(legend.position = "none")
+
+b <- ggplot(grid_tile) + geom_tile(aes(x, y, fill = fair)) +
+  coord_fixed(ratio = 1.4) +
+  scale_fill_gradient(
+    name = "Prob",
     low = "black", high = "#51CDAA"
   ) +
-  theme_void()
+  theme_void() +
+  ggtitle("Fair")+
+  scale_alpha(range = c(0, 1))+
+  theme(legend.position = "none")
 
-ggplot(grid_tile) + geom_tile(aes(x, y, fill = good)) +
- coord_fixed(ratio = 1) +
+
+c <- ggplot(grid_tile) + geom_tile(aes(x, y, fill = moderate)) +
+  coord_fixed(ratio = 1.4) +
   scale_fill_gradient(
-    name = "Good",
-    low = "white", high = "#52F0E6"
-  ) +  theme_void()
-
-
-ggplot(grid_tile) + geom_tile(aes(x, y, fill = fair)) +
-  coord_fixed(ratio = 1) +
-  scale_fill_gradient(
-    name = "Fair",
-    low = "black", high = "#51CDAA"
+    name = "Prob",
+    low = "black", high = "#EEE741"
   ) +
-  theme_void()
+  theme_void() +
+  ggtitle("Moderate")+
+  scale_alpha(range = c(0, 1))+
+  theme(legend.position = "none")
 
 
-ggplot(grid_tile) + geom_tile(aes(x, y, fill = fair)) +
-  coord_fixed(ratio = 1) +
+d <- ggplot(grid_tile) + geom_tile(aes(x, y, fill = poor)) +
+  coord_fixed(ratio = 1.4) +
   scale_fill_gradient(
-    name = "Fair",
-    low = "black", high = "#51CDAA"
+    name = "Prob",
+    low = "black", high = "#FE5050"
   ) +
-  theme_void()
+  theme_void() +
+  ggtitle("Poor")+
+  scale_alpha(range = c(0, 1))+
+  theme(legend.position = "none")
 
+e <- ggplot(grid_tile) + geom_tile(aes(x, y, fill = verypoor)) +
+  coord_fixed(ratio = 1.4) +
+  scale_fill_gradient(
+    name = "Prob",
+    low = "black", high = "#A4122E"
+  ) +
+  theme_void() +
+  ggtitle("Very Poor")+
+  scale_alpha(range = c(0, 1)) +
+  theme(legend.position = "none")
 
-
+library(patchwork)
+(a | b | c | d | e)
 
 # 
 # 
